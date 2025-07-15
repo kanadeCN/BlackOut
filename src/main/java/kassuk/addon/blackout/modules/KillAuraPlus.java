@@ -14,7 +14,6 @@ import kassuk.addon.blackout.utils.meteor.BODamageUtils;
 import meteordevelopment.meteorclient.events.render.Render3DEvent;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.friends.Friends;
-import meteordevelopment.meteorclient.utils.entity.DamageUtils;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
 import meteordevelopment.meteorclient.utils.player.Rotations;
 import meteordevelopment.orbit.EventHandler;
@@ -199,7 +198,7 @@ public class KillAuraPlus extends BlackOutModule {
                 continue;
             }
 
-            dmg = DamageUtils.getAttackDamage(mc.player, target, stack);
+            dmg = BODamageUtils.getSwordDamage(stack, mc.player, target, true);
             if (dmg > hDmg) {
                 slot = i;
                 hDmg = dmg;

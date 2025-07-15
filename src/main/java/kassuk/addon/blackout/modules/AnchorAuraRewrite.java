@@ -544,7 +544,7 @@ public class AnchorAuraRewrite extends BlackOutModule {
         self = -1;
 
         targets.forEach(target -> {
-            double d = BODamageUtils.anchorDamage(target, extMap.containsKey(target) ? extMap.get(target) : target.getBoundingBox(), pos.toCenterPos(), pos, true);
+            double d = BODamageUtils.anchorDamage(target, extMap.containsKey(target) ? extMap.get(target) : target.getBoundingBox(), pos);
 
             if (target == mc.player) self = Math.max(self, d);
             else if (Friends.get().isFriend(target)) friend = Math.max(friend, d);

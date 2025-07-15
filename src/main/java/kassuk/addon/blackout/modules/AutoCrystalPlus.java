@@ -175,12 +175,6 @@ public class AutoCrystalPlus extends BlackOutModule {
         .defaultValue(false)
         .build()
     );
-    private final Setting<Boolean> inhibit = sgExplode.add(new BoolSetting.Builder()
-        .name("Inhibit")
-        .description("Stops targeting attacked crystals.")
-        .defaultValue(false)
-        .build()
-    );
     private final Setting<DelayMode> existedMode = sgExplode.add(new EnumSetting.Builder<DelayMode>()
         .name("Existed Mode")
         .description("Should crystal existed times be counted in seconds or ticks.")
@@ -664,8 +658,8 @@ public class AutoCrystalPlus extends BlackOutModule {
     private BlockPos placePos = null;
     private Direction placeDir = null;
     private Entity expEntity = null;
+    private Box expEntityBB = null;
     private final TimerList<Integer> attackedList = new TimerList<>();
-    private final TimerList<Integer> inhibitList = new TimerList<>();
     private final Map<BlockPos, Long> existedList = new HashMap<>();
     private final Map<BlockPos, Long> existedTicksList = new HashMap<>();
     private final Map<BlockPos, Long> own = new HashMap<>();
@@ -766,7 +760,6 @@ public class AutoCrystalPlus extends BlackOutModule {
     @EventHandler(priority = EventPriority.HIGHEST + 1)
     private void onRender3D(Render3DEvent event) {
         attackedList.update();
-        inhibitList.update();
 
         if (autoMine == null) autoMine = Modules.get().get(AutoMine.class);
 
@@ -788,6 +781,7 @@ public class AutoCrystalPlus extends BlackOutModule {
         }
         cps /= 4.5;
 
+        attackedList.update();
         attackTimer = Math.max(attackTimer - delta, 0);
         placeTimer = Math.max(placeTimer - delta * getSpeed(), 0);
         placeLimitTimer += delta;
@@ -996,9 +990,9 @@ public class AutoCrystalPlus extends BlackOutModule {
 
         if (!isPaused() && (hand != null || switchMode.get() == SwitchMode.Silent || switchMode.get() == SwitchMode.PickSilent || switchMode.get() == SwitchMode.InvSilent) && explode.get()) {
             for (Entity en : mc.world.getEntities()) {
-                if (!(en instanceof EndCrystalEntity)) continue;
+
                 if (paAttack.get() && pa.isActive() && en.getBlockPos().equals(pa.crystalPos)) continue;
-                if (inhibitList.contains(en.getId())) continue;
+                if (!(en instanceof EndCrystalEntity)) continue;
                 if (switchTimer > 0) continue;
 
                 double[] dmg = getDmg(en.getPos(), true)[0];
@@ -1015,10 +1009,14 @@ public class AutoCrystalPlus extends BlackOutModule {
         if (expEntity != null) {
             if (multiTaskCheck() && !isAttacked(expEntity.getId()) && attackDelayCheck() && existedCheck(expEntity.getBlockPos())) {
                 if (!SettingUtils.shouldRotate(RotationType.Attacking) || startAttackRot()) {
+                    if (SettingUtils.shouldRotate(RotationType.Attacking)) expEntityBB = expEntity.getBoundingBox();
                     explode(expEntity.getId(), expEntity.getPos());
                 }
             }
-        } else if (SettingUtils.shouldRotate(RotationType.Attacking)) Managers.ROTATION.end(Objects.hash(name + "attacking"));
+        }
+
+        if (!isAlive(expEntityBB) && SettingUtils.shouldRotate(RotationType.Attacking))
+            Managers.ROTATION.end(Objects.hash(name + "attacking"));
     }
 
     private boolean attackDelayCheck() {
@@ -1029,6 +1027,7 @@ public class AutoCrystalPlus extends BlackOutModule {
     }
 
     private boolean startAttackRot() {
+        expEntityBB = expEntity.getBoundingBox();
         return (Managers.ROTATION.start(expEntity.getBoundingBox(), smartRot.get() ? expEntity.getPos() : null, priority + (!isAttacked(expEntity.getId()) && blocksPlacePos(expEntity) ? -0.1 : 0.1), RotationType.Attacking, Objects.hash(name + "attacking")));
     }
 
@@ -1179,7 +1178,6 @@ public class AutoCrystalPlus extends BlackOutModule {
         if (mc.player != null) {
             lastAttack = System.currentTimeMillis();
             attackedList.add(id, 1 / expSpeed.get());
-            if (inhibit.get()) inhibitList.add(id, 0.5);
 
             delayTimer = 0;
             delayTicks = 0;
@@ -1375,7 +1373,7 @@ public class AutoCrystalPlus extends BlackOutModule {
     }
 
     private double[][] getDmg(Vec3d vec, boolean attack) {
-        double self = BODamageUtils.crystalDamage(mc.player, extPos.containsKey(mc.player) ? extPos.get(mc.player) : mc.player.getBoundingBox(), vec, ignorePos(attack), ignoreTerrain.get());
+        double self = BODamageUtils.crystal(mc.player, extPos.containsKey(mc.player) ? extPos.get(mc.player) : mc.player.getBoundingBox(), vec, ignorePos(attack), ignoreTerrain.get());
 
         if (suicide) return new double[][]{new double[]{self, -1, -1}, new double[]{20, 20}};
 
@@ -1388,7 +1386,7 @@ public class AutoCrystalPlus extends BlackOutModule {
             Box box = entry.getValue();
             if (player.getHealth() <= 0 || player == mc.player) continue;
 
-            double dmg = BODamageUtils.crystalDamage(player, box, vec, ignorePos(attack), ignoreTerrain.get());
+            double dmg = BODamageUtils.crystal(player, box, vec, ignorePos(attack), ignoreTerrain.get());
             if (BlockPos.ofFloored(vec).down().equals(autoMine.targetPos()))
                 dmg *= autoMineDamage.get();
             double hp = player.getHealth() + player.getAbsorptionAmount();
